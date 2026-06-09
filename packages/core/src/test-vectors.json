@@ -1,0 +1,100 @@
+{
+  "$schema": "https://keptex.app/schemas/test-vectors-v1.json",
+  "schemaVersion": 1,
+  "algorithm": "v2",
+  "lastGenerated": "2026-06-05",
+  "notes": [
+    "Reference test vectors for @keptex/core.",
+    "Each vector specifies (signer, options) inputs and the expected password output.",
+    "Vectors are language-agnostic and can be verified by any independent re-implementation.",
+    "Path A (wallet-imported): the 'signature' field is the fixed signature returned by the mock signer.",
+    "Path B (wallet-native): the 'userKey' field is the fixed 64-byte userKey returned by the mock signer.",
+    "expected.password values: TBD, to be populated once Étape 1 tests pass on a clean run."
+  ],
+  "vectors": [
+    {
+      "name": "stellar-basic-github-default-policy",
+      "description": "Basic case: Stellar imported wallet, github.com, default policy",
+      "path": "A",
+      "input": {
+        "signer": {
+          "type": "wallet-imported",
+          "chain": "stellar",
+          "address": "GAXYTRQK3CPMHFZ4WLOVB5HJDD5R7VLNXTPHAESVFRH7BYIMW2EXY7QY",
+          "signatureHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526272829"
+        },
+        "service": "github.com",
+        "username": "alice",
+        "counter": 1
+      },
+      "expected": {
+        "password": ".DOw@&8xpg!3wceKT4sKG"
+      }
+    },
+    {
+      "name": "stellar-counter-rotation",
+      "description": "Same Stellar wallet, same service, counter=2, must differ from counter=1",
+      "path": "A",
+      "input": {
+        "signer": {
+          "type": "wallet-imported",
+          "chain": "stellar",
+          "address": "GAXYTRQK3CPMHFZ4WLOVB5HJDD5R7VLNXTPHAESVFRH7BYIMW2EXY7QY",
+          "signatureHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526272829"
+        },
+        "service": "github.com",
+        "username": "alice",
+        "counter": 2
+      },
+      "expected": {
+        "password": "FU-99J-uyNquN56GVKas="
+      }
+    },
+    {
+      "name": "native-basic-github-default-policy",
+      "description": "Keptex-native wallet (Path B), github.com, default policy",
+      "path": "B",
+      "input": {
+        "signer": {
+          "type": "wallet-native",
+          "identifier": "keptex-native:test-alice",
+          "userKeyHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40"
+        },
+        "service": "github.com",
+        "username": "alice",
+        "counter": 1
+      },
+      "expected": {
+        "password": "*94QTnAXqRF30&GMGjDqT"
+      }
+    },
+    {
+      "name": "pin-numeric-only-length-4",
+      "description": "Edge case: numeric-only PIN, length 4",
+      "path": "A",
+      "input": {
+        "signer": {
+          "type": "wallet-imported",
+          "chain": "evm",
+          "address": "0xabcdef0123456789abcdef0123456789abcdef01",
+          "signatureHex": "deadbeefcafebabedeadbeefcafebabedeadbeefcafebabe0102030405060708"
+        },
+        "service": "bank.example",
+        "username": "alice",
+        "counter": 1,
+        "policy": {
+          "length": 4,
+          "uppercase": false,
+          "lowercase": false,
+          "numbers": true,
+          "special": false,
+          "allowedSpecial": "",
+          "excludedChars": ""
+        }
+      },
+      "expected": {
+        "password": "8067"
+      }
+    }
+  ]
+}
