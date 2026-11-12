@@ -62,6 +62,7 @@ identity.destroy()   // wipe the seed when the session ends
 | `sealSyncEnvelope({ userKey, identity, seq, data })` | Sync envelope of any JSON-serialisable metadata, bound to the identity and to `seq` (section 6). |
 | `openSyncEnvelope({ userKey, identity, seq, envelope })` | Authenticated decryption under the record's `seq`, then canonical content checks; returns the parsed metadata. |
 | `syncEnvelopeSize(n)`, `MAX_SYNC_METADATA_BYTES` | Envelope size for `n` bytes of compact JSON; largest JSON that fits (15 360 bytes). |
+| `syncPolicy(securityMode, { keyOnly? })`, `SYNC_POLICY_MESSAGES` | The verdict (`allowed`, `warn`, `refused`) and the message key for a vault's security mode, and the exact texts to show (LEDGER-SYNC.md section 9). `key-plus-secret` is allowed, `key-only` is refused by default (`keyOnly: 'warn'` returns `warn` with the warning text), `key-plus-password` and any unknown value are refused. |
 | `assertEnvelopeSize`, `normaliseSequence` | Client-side bounds: envelope 1 to 16 384 bytes, sequence 1 to 2^64 - 1. |
 | `LedgerSyncError` | Coded errors: `INVALID_INPUT`, `INVALID_CONTRACT`, `INVALID_SEQUENCE`, `SEQUENCE_JUMP`, `STALE_SEQUENCE`, `ENVELOPE_SIZE`, `ENVELOPE_VERSION`, `ENVELOPE_CORRUPT`, `INVALID_DATA`, `IDENTITY_DESTROYED`. |
 
@@ -98,9 +99,27 @@ The JSON schema is not fixed by the v1 specification; it is set before the first
 - **Lying read path.** A hostile RPC or relayer that also serves `get` and `last_seq` cannot lock an identity with an inflated sequence (exact increment on-chain, `lastKnownSeq` locally), and cannot pass an old envelope off as the current record (sequence in the AAD). It can still withhold data or report a stale `last_seq`, which only makes the next write fail.
 - **Replay.** The sequence survives a removal (tombstone, readable with `last_seq`). The contract ID is in every payload, and a contract ID commits to the network passphrase, so a signature for one deployment or network is useless on another.
 - **Confidentiality.** The ledger is public. It reveals the identity (a stable pseudonym), the time and sequence of every write and the envelope size in 1 024-byte steps. Counts, dates and names stay inside the ciphertext. Nothing links the identity to the user's Stellar account on-chain, unless the user submits from that account.
+- **Long-term confidentiality.** What is written to the ledger is permanent: `remove` deletes the envelope from the current state, but every earlier version stays in the history of the chain with its content, so "harvest now, decrypt later" is the reference attack. The cipher (AES-256-GCM) is considered safe against quantum computers; the weak point is the key derivation. Without a second factor the identity and the envelope key derive from the wallet's Ed25519 private key, which a large enough quantum computer could recover from the public address, and which a thief of the wallet key already holds. With a random Secret Key (`key-plus-secret`) the wallet key alone derives neither (`tests/second-factor.test.ts`, with a `key-only` control where the same attack succeeds). This only holds if you pass the **final** `userKey` (secret included) to `deriveLedgerIdentity` and to the envelope functions, never the base key. With a master password (`key-plus-password`) the public block can be attacked offline without limit, so the mode does not have the property. Use `syncPolicy` before enabling Ledger Sync, as below.
 - **AES implementation.** The envelope uses `@noble/ciphers` AES-256-GCM, a pure JavaScript implementation with lookup tables (T-tables), on a static per-user `envelopeKey`. Table lookups indexed by key-dependent data can leak through cache timing to code that shares the CPU cache and can trigger many encryptions; in a JavaScript runtime this is hard to exploit, and an envelope is sealed or opened a handful of times per session. WebCrypto AES-GCM would avoid it, but `crypto.subtle` is not guaranteed on every Keptex target: the mobile app (React Native, Expo) documents that it is not consistently available and already uses noble for its own AEAD for that reason, and no `crypto.subtle` polyfill is installed there. The package therefore keeps one implementation everywhere; switching to WebCrypto is a drop-in change (same bytes) once every target guarantees it.
 - **Secret hygiene.** The Ledger Identity seed lives in a private field, never in a property, JSON or inspection output. The object exposes no general-purpose signing method, so it cannot be used as an oracle for other data. `destroy()` wipes the seed, and the envelope code wipes its key and plaintext after use (best effort: JavaScript engines may keep copies). Error messages never quote the metadata.
 - **Root compromise.** Anyone who obtains `userKey` (or the wallet behind it, in key-only mode) can read the metadata, publish or remove. This is no weaker than the rest of the vault, which the same key protects.
+
+## Long-term confidentiality and `syncPolicy`
+
+```ts
+import { SYNC_POLICY_MESSAGES, syncPolicy } from '@keptex/ledger-sync'
+
+const policy = syncPolicy(vault.securityMode) // 'key-only' | 'key-plus-password' | 'key-plus-secret'
+if (policy.verdict === 'allowed') {
+  // Ledger Sync may be enabled.
+} else if (policy.verdict === 'refused') {
+  // Do not enable. Show SYNC_POLICY_MESSAGES[policy.messageKey] where the user asks why.
+}
+// Tolerated variant for key-only: syncPolicy(mode, { keyOnly: 'warn' }) returns 'warn'.
+// Show SYNC_POLICY_MESSAGES[policy.messageKey] in full and require an explicit confirmation.
+```
+
+Anything that is not exactly one of the three modes is refused. The texts say that everything written stays public for ever, including older versions and what the user later deletes, and they promise nothing beyond that. The rules and the exact texts are in LEDGER-SYNC.md section 9.
 
 ## Test vectors
 

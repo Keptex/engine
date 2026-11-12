@@ -56,3 +56,12 @@ export {
   syncEnvelopeSize,
 } from './envelope.js'
 export type { IdentityRef, OpenSyncEnvelopeArgs, SealSyncEnvelopeArgs } from './envelope.js'
+
+export { SYNC_POLICY_MESSAGES, syncPolicy } from './policy.js'
+export type {
+  SyncPolicy,
+  SyncPolicyMessageKey,
+  SyncPolicyOptions,
+  SyncPolicyVerdict,
+  SyncSecurityMode,
+} from './policy.js'
