@@ -1,7 +1,8 @@
 # Contributing to Keptex Engine
 
 Thank you for considering a contribution. This repository contains the Keptex
-derivation engine: `@keptex/core` and `@keptex/passkey`, source-available under the
+derivation engine, `@keptex/core` and `@keptex/passkey`, and its Stellar layer,
+`@keptex/stellar-root` and `@keptex/ledger-sync`, source-available under the
 [PolyForm Noncommercial License 1.0.0](LICENSE). Security review and contributions
 to the algorithm are especially welcome.
 
@@ -41,6 +42,13 @@ be UK English.
   in an issue first.
 - `@keptex/passkey` may depend on `@noble/curves` (Trail of Bits audited), because
   Web Crypto cannot import Ed25519 / ES256 keys from raw seeds.
+- `@keptex/stellar-root` and `@keptex/ledger-sync` depend on `@noble/curves`,
+  `@noble/hashes` and `@noble/ciphers` pinned to **exact** versions: strict
+  verification relies on their point decoding, so an upgrade is a reviewed change
+  that reruns the Ed25519 edge cases.
+- A change to [docs/LEDGER-SYNC.md](docs/LEDGER-SYNC.md) is a breaking change for
+  the Soroban contract as well: payloads and vectors must stay byte-identical on
+  both sides.
 - New cryptographic logic must ship with **at least one fixed test vector** that
   maps known inputs to known outputs, committed as JSON next to the test.
 
@@ -86,7 +94,7 @@ The body explains the why, not the what.
 1. Branch from `main` using `<type>/<short-slug>` (e.g. `fix/passkey-rotation-counter`).
 2. Keep pull requests small and focused: one thing per PR.
 3. Run the green bar locally before opening the PR.
-4. Algorithm-touching changes (`@keptex/core`, `@keptex/passkey`) get extra scrutiny;
+4. Algorithm-touching changes (any of the four packages) get extra scrutiny;
    include the reasoning and the updated test vectors.
 
 ---

@@ -8,7 +8,7 @@ Passkey derivation is extracted from `@keptex/core` precisely so that `core` can
 
 ## Install
 
-Keptex packages are not yet published to npm. Within the monorepo:
+Keptex packages are not yet published to npm. Within this workspace:
 
 ```json
 {

@@ -26,6 +26,16 @@ Tell us what you are building, the platform (browser extension, mobile, desktop,
 web), and the scope you have in mind. We will reply with the integration path and
 terms.
 
+## Stellar wallets
+
+A Stellar wallet that signs messages per SEP-53 can check, on its own and without
+any agreement, whether it would work as a Keptex root: import the public test key
+of [`packages/stellar-root/conformance-vectors.json`](packages/stellar-root/conformance-vectors.json)
+(never fund it), sign the `message` of each case, and compare the result with
+`signature`. Section 9 of [TEST-VECTORS.md](TEST-VECTORS.md) explains the file.
+The Soroban contract used by Ledger Sync is licensed separately, see
+[Keptex/sync-registry](https://github.com/Keptex/sync-registry).
+
 ## Why this model
 
 Keptex is a credential derivation engine that wallets can embed to offer a native
