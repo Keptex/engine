@@ -1,0 +1,39 @@
+{
+  "name": "@keptex/stellar-root",
+  "version": "0.1.0",
+  "description": "Keptex Stellar Root: SEP-53 message signing roots for the derivation engine, with strict Ed25519 verification and SEP-23 strkeys. Source-available (PolyForm Noncommercial).",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./conformance-vectors.json": "./conformance-vectors.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "conformance-vectors.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "vectors": "node scripts/generate-conformance-vectors.mjs",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@keptex/core": "workspace:*",
+    "@noble/curves": "1.9.7",
+    "@noble/hashes": "1.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.6"
+  }
+}

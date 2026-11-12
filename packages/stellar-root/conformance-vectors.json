@@ -1,0 +1,48 @@
+{
+  "spec": "LEDGER-SYNC.md, section 1 (SEP-53 Stellar Root)",
+  "specVersion": "v1",
+  "warning": "PUBLIC TEST KEY. The secret seed below is published on purpose. Never fund this account and never use it outside conformance testing.",
+  "notes": [
+    "Reference values of the Stellar Root wallet conformance matrix. A wallet passes when, after importing secretSeed, its SEP-53 signature of `message` equals `signature` byte for byte (after normalisation of its output encoding).",
+    "seed = SHA-256(UTF-8(seedLabel)); the key pair is the RFC 8032 Ed25519 key pair of that 32-byte seed; secretSeed and address are its SEP-23 strkeys (S version byte 18 << 3, G version byte 6 << 3).",
+    "message is the Keptex authentication message built by @keptex/core for identifier = \"stellar:\" + address, captured from deriveUserKey. It is signed as UTF-8.",
+    "sep53Hash = SHA-256(UTF-8(\"Stellar Signed Message:\\n\") || UTF-8(message)). signature = Ed25519(seed, sep53Hash), deterministic.",
+    "baseUserKey = PBKDF2-HMAC-SHA-256(password = signature, salt = UTF-8(identifier), 100 000 iterations, 64 bytes).",
+    "userKey: for the key-only case it equals baseUserKey; for the second-factor case it is HKDF-SHA-256(IKM = baseUserKey, salt = secretKey, info = UTF-8(\"com.keptex.secretkey\"), L = 64), with the fixed secretKey bytes 0xa0..0xbf.",
+    "All byte values are lower-case hex without prefix, except signatureBase64."
+  ],
+  "key": {
+    "seedLabel": "keptex-stellar-root-conformance-v1",
+    "seed": "5114ec36b983c9ab6bdcfbfdded69feff4dc040cf476b7f1c76d3fcfa84873aa",
+    "secretSeed": "SBIRJ3BWXGB4TK3L3T573XWWT7X7JXAEBT2HNN7RY5WT7T5IJBZ2VBTD",
+    "publicKey": "f7ee3bb7024c0999d0610cb5d218e466f7ef4f87de652a084cec4f25b8a786cc",
+    "address": "GD364O5XAJGATGOQMEGLLUQY4RTPP32PQ7PGKKQIJTWE6JNYU6DMZEVE"
+  },
+  "cases": [
+    {
+      "name": "key-only",
+      "secondFactor": false,
+      "identifier": "stellar:GD364O5XAJGATGOQMEGLLUQY4RTPP32PQ7PGKKQIJTWE6JNYU6DMZEVE",
+      "message": "Keptex\n\nSign to derive your passwords and passkeys on this device, from your wallet.\n\nThis signature never leaves your device and is never sent anywhere.\nIt cannot move funds, transfer tokens, or approve any transaction.\nOnly sign this inside the Keptex extension or app, never on a website.\n\nAccount: stellar:GD364O5XAJGATGOQMEGLLUQY4RTPP32PQ7PGKKQIJTWE6JNYU6DMZEVE\nScope: com.keptex.authentication.v1",
+      "messageHex": "4b65707465780a0a5369676e20746f2064657269766520796f75722070617373776f72647320616e6420706173736b657973206f6e2074686973206465766963652c2066726f6d20796f75722077616c6c65742e0a0a54686973207369676e6174757265206e65766572206c656176657320796f75722064657669636520616e64206973206e657665722073656e7420616e7977686572652e0a49742063616e6e6f74206d6f76652066756e64732c207472616e7366657220746f6b656e732c206f7220617070726f766520616e79207472616e73616374696f6e2e0a4f6e6c79207369676e207468697320696e7369646520746865204b657074657820657874656e73696f6e206f72206170702c206e65766572206f6e206120776562736974652e0a0a4163636f756e743a207374656c6c61723a47443336344f3558414a474154474f514d45474c4c5551593452545050333250513750474b4b51494a545745364a4e595536444d5a4556450a53636f70653a20636f6d2e6b65707465782e61757468656e7469636174696f6e2e7631",
+      "sep53Hash": "8a51cd001fd148486c7a165e37f7c08e8ed0293acdc1bb86f8ed40fec3b964e0",
+      "signature": "4024995523356b3fd53f95ca9eaeb2c740f0cfca38ec6c680c80498b5e957fd08d5b3589e8cce8d26372159913d344fed3aa01bae07282caea2769d45d21330b",
+      "signatureBase64": "QCSZVSM1az/VP5XKnq6yx0Dwz8o47GxoDIBJi16Vf9CNWzWJ6Mzo0mNyFZkT00T+06oBuuBygsrqJ2nUXSEzCw==",
+      "baseUserKey": "39900e66b507792c7033297b00cc34ac7d236fe3b08f27924ca855f301e438657f35f626572730451b401e1c18fa31cb885e43b86c213bb5314896e9c9a844a0",
+      "userKey": "39900e66b507792c7033297b00cc34ac7d236fe3b08f27924ca855f301e438657f35f626572730451b401e1c18fa31cb885e43b86c213bb5314896e9c9a844a0"
+    },
+    {
+      "name": "second-factor",
+      "secondFactor": true,
+      "identifier": "stellar:GD364O5XAJGATGOQMEGLLUQY4RTPP32PQ7PGKKQIJTWE6JNYU6DMZEVE",
+      "message": "Keptex\n\nSign to derive your passwords and passkeys on this device, from your wallet.\n\nThis signature never leaves your device and is never sent anywhere.\nIt cannot move funds, transfer tokens, or approve any transaction.\nOnly sign this inside the Keptex extension or app, never on a website.\n\nAccount: stellar:GD364O5XAJGATGOQMEGLLUQY4RTPP32PQ7PGKKQIJTWE6JNYU6DMZEVE\nSecond factor: enabled\nScope: com.keptex.authentication.v1",
+      "messageHex": "4b65707465780a0a5369676e20746f2064657269766520796f75722070617373776f72647320616e6420706173736b657973206f6e2074686973206465766963652c2066726f6d20796f75722077616c6c65742e0a0a54686973207369676e6174757265206e65766572206c656176657320796f75722064657669636520616e64206973206e657665722073656e7420616e7977686572652e0a49742063616e6e6f74206d6f76652066756e64732c207472616e7366657220746f6b656e732c206f7220617070726f766520616e79207472616e73616374696f6e2e0a4f6e6c79207369676e207468697320696e7369646520746865204b657074657820657874656e73696f6e206f72206170702c206e65766572206f6e206120776562736974652e0a0a4163636f756e743a207374656c6c61723a47443336344f3558414a474154474f514d45474c4c5551593452545050333250513750474b4b51494a545745364a4e595536444d5a4556450a5365636f6e6420666163746f723a20656e61626c65640a53636f70653a20636f6d2e6b65707465782e61757468656e7469636174696f6e2e7631",
+      "sep53Hash": "4363e8109224ade67284a6abe9f62be8c2d5e5eeac494f3e526278ae9f2146fe",
+      "signature": "3cd8c1bfd73a143aec037bd13e739842c0c967723686074b6537c27a81f9499fa4b1b2755168daac6a557adca28a8757298de030ddba00f8f3ebbc5d53bc8b0b",
+      "signatureBase64": "PNjBv9c6FDrsA3vRPnOYQsDJZ3I2hgdLZTfCeoH5SZ+ksbJ1UWjarGpVetyiiodXKY3gMN26APjz67xdU7yLCw==",
+      "baseUserKey": "e1d5e055b7ac6d6c3689b9361831b4160c0e77f9d68891fa257daccd5e21fee3b98613b35fcc1aa72dd74ee1f386b8f18b891ab765adb1625f527ad2617c7ddf",
+      "secretKey": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+      "userKey": "273329e4f725eba3af2436b819c0276ab43740849ebe2080dc12c0e201ee555c51699ae0a80a04e944806bfee814a22e21a32041722bb21c46e0d64fc40f2c8c"
+    }
+  ]
+}

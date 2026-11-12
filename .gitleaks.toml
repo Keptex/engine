@@ -1,6 +1,6 @@
 # Gitleaks configuration for the Keptex engine.
 #
-# The default rules stay on. The only allowlisted paths are the published,
+# The default rules stay on. The only allowlisted entries are the published,
 # deliberately public test vectors: fixed mock signatures, fixed user keys
 # and fixed secret keys whose whole purpose is to be reproduced by anyone.
 # None of them protects anything. Every other file is scanned normally.
@@ -14,4 +14,15 @@ paths = [
   # Password derivation vectors: mock signatures, mock user keys, fixed
   # secret keys and their recovery codes (TEST-VECTORS.md).
   '''packages/core/src/test-vectors\.json''',
+  # Stellar Root conformance vectors: a published test key (documented as
+  # public, never to be funded), its address, messages and signatures.
+  '''packages/stellar-root/conformance-vectors\.json''',
+  # Published Ed25519 edge cases (Taming the many EdDSAs, CCTV, dalek
+  # non-canonical encodings): public keys and signatures, no secret.
+  '''packages/stellar-root/tests/fixtures/ed25519-edge-cases\.json''',
+]
+# One public key used by the SEP-23 strkey tests, matched exactly rather
+# than allowlisting the whole test file.
+regexes = [
+  '''^3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a$''',
 ]
