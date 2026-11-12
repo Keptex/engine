@@ -121,6 +121,15 @@ export async function hmacSha256(key: Uint8Array, data: Uint8Array): Promise<Uin
  * mode, so a different account or mode yields a different signature (hence a
  * different key).
  *
+ * The "Only sign this inside the Keptex extension or app" line is an
+ * anti-phishing warning: the message does not depend on the requesting site, so
+ * any site connected to the same wallet could ask for this signature. The
+ * warning does not prevent that; it tells the user where the request is
+ * legitimate.
+ *
+ * The whole message must stay within 1 024 UTF-8 bytes, the limit of
+ * `stellar_signMessage` in the Varial mobile wallet (checked by the tests).
+ *
  * The identifier is a chain-prefixed address (e.g. "stellar:GAXY...", produced
  * by the chain adapters). We reject control characters defensively so the
  * labelled lines stay unambiguous and no identifier can forge another line; the
@@ -139,6 +148,7 @@ function buildAuthMessage(identifier: string, secondFactor: boolean): string {
     '',
     'This signature never leaves your device and is never sent anywhere.',
     'It cannot move funds, transfer tokens, or approve any transaction.',
+    'Only sign this inside the Keptex extension or app, never on a website.',
     '',
     `Account: ${identifier}`,
   ]
