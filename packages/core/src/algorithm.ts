@@ -17,6 +17,14 @@ export function assertCrypto(): void {
   }
 }
 
+/**
+ * True for a Uint8Array from any realm (an `instanceof` test fails for an
+ * array created in another frame or by a DOM test environment).
+ */
+export function isUint8Array(value: unknown): value is Uint8Array {
+  return Object.prototype.toString.call(value) === '[object Uint8Array]'
+}
+
 export function encodeUtf8(str: string): Uint8Array {
   return new TextEncoder().encode(str)
 }
@@ -210,20 +218,25 @@ export async function deriveUserKey(
   options?: { secretKey?: Uint8Array },
 ): Promise<Uint8Array> {
   const secretKey = options?.secretKey
-  const baseUserKey = await deriveBaseUserKey(signer, secretKey !== undefined)
 
   if (secretKey === undefined) {
-    return baseUserKey
+    return deriveBaseUserKey(signer, false)
   }
 
-  if (secretKey.length !== 32) {
-    throw new KeptexError(
-      `Secret Key must be exactly 32 bytes (got ${secretKey.length})`,
-      'INVALID_INPUT',
-    )
+  // Checked before the signer is called: a malformed second factor must
+  // never cost a wallet prompt, and must never fall back to key-only.
+  if (!isUint8Array(secretKey) || secretKey.length !== 32) {
+    throw new KeptexError('Secret Key must be exactly 32 bytes', 'INVALID_INPUT')
   }
-
-  return hkdfSha256(baseUserKey, secretKey, encodeUtf8(SCOPES.secretKey), 64)
+  // Private copy, so a caller wiping or reusing its buffer while the signer
+  // is waiting cannot change the key that gets mixed in.
+  const salt = new Uint8Array(secretKey)
+  const baseUserKey = await deriveBaseUserKey(signer, true)
+  try {
+    return await hkdfSha256(baseUserKey, salt, encodeUtf8(SCOPES.secretKey), 64)
+  } finally {
+    salt.fill(0)
+  }
 }
 
 /**

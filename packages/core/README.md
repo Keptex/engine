@@ -29,8 +29,8 @@ Top-level exports from `@keptex/core`:
 | `derivePassword(signer, opts)` | function | One-shot convenience: combines Phase 1 + Phase 2 + Phase 3a. |
 | `derivePasswordFromUserKey(userKey, opts)` | function | Phase 3a from a cached userKey (the cached path). |
 | `generateSecretKey()` | function | Generate a fresh 32-byte secret key for the second-factor mode (CSPRNG). |
-| `encodeRecoveryCode(secretKey)` | function | Encode a 32-byte secret key as a Crockford base32 recovery code (52 characters, 13 dash-separated groups of 4). |
-| `decodeRecoveryCode(code)` | function | Decode a recovery code back to the 32-byte secret key. Tolerant parse; throws `KeptexError('INVALID_RECOVERY_CODE')` on a malformed code. |
+| `encodeRecoveryCode(secretKey)` | function | Encode a 32-byte secret key as a recovery code: Crockford base32 of the key and its CRC-24 checksum, 56 characters in 14 dash-separated groups of 4. |
+| `decodeRecoveryCode(code)` | function | Decode a recovery code back to the 32-byte secret key. Tolerant of case, spacing and dashes; throws `KeptexError('INVALID_RECOVERY_CODE')` on a wrong length, an unknown character or a checksum mismatch (a typing error). |
 | `WalletSigner` | class | Convenience wrapper around an `(address, signMessage)` pair. |
 | `SCOPES` | constant | Domain separators used in Phase 1: `authentication` and `secretKey`, plus two reserved labels (`identification`, `recovery`) that no derivation uses yet. |
 | `DEFAULT_POLICY` | constant | Default `PasswordPolicy` (length 21, all classes enabled). |
@@ -88,8 +88,8 @@ import {
 
 // At vault creation, once:
 const secretKey = generateSecretKey()                 // 32 random bytes
-const recoveryCode = encodeRecoveryCode(secretKey)    // show to the user exactly once
-// "ABCD-EFGH-..." (52 characters, 13 dash-separated groups of 4)
+const recoveryCode = encodeRecoveryCode(secretKey)    // show until the user confirms it is saved
+// "24C1-Y9HD-..." (56 characters, 14 dash-separated groups of 4, checksum included)
 
 // Per session, derive with the secret key folded in via
 // HKDF-SHA-256(IKM = baseUserKey, salt = secretKey, info = "com.keptex.secretkey", L = 64):
@@ -103,7 +103,9 @@ const { password } = await derivePasswordFromUserKey(userKey, {
 const restored = decodeRecoveryCode(recoveryCode)     // same 32 bytes as secretKey
 ```
 
-When the `{ secretKey }` option is omitted, `deriveUserKey` behaves as in `key-only` mode. The secret key must be exactly 32 bytes when present. With an imported wallet, the second-factor mode also adds the line `Second factor: enabled` to the message the wallet signs (see [ALGORITHM.md](../../ALGORITHM.md) section 4), so the wallet pop-up shows the active mode. Storing the secret key (for example inside an encrypted vault) is up to the application; this package never persists anything.
+When the `{ secretKey }` option is omitted, `deriveUserKey` behaves as in `key-only` mode. A `secretKey` that is not a 32-byte `Uint8Array` is refused before the signer is called, so a malformed second factor never costs a wallet prompt and never falls back to `key-only`. `decodeRecoveryCode` refuses a mistyped code (checksum) and never repeats the input in its errors. With an imported wallet, the second-factor mode also adds the line `Second factor: enabled` to the message the wallet signs (see [ALGORITHM.md](../../ALGORITHM.md) section 4), so the wallet pop-up shows the active mode. Storing the secret key (for example inside an encrypted vault) is up to the application; this package never persists anything.
+
+Why use it: the message an imported wallet signs is fixed, so any site connected to the same wallet can ask for that signature. With a secret key mixed in, the signature alone regenerates nothing. What it costs: without the recovery code the vault cannot be rebuilt on another device. Showing the code, making sure the user saved it, and not showing it afterwards are the application's job. Threat model: [ALGORITHM.md](../../ALGORITHM.md), section 11.1.
 
 For a worked example of every phase against the published vectors, see [TEST-VECTORS.md](../../TEST-VECTORS.md).
 

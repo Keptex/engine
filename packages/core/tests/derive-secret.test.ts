@@ -126,4 +126,43 @@ describe('Secret Key validation', () => {
       deriveUserKey(importedAlice(), { secretKey: new Uint8Array(64) }),
     ).rejects.toBeInstanceOf(KeptexError)
   })
+
+  it('refuses anything that is not a 32-byte Uint8Array, before the wallet is asked to sign', async () => {
+    let prompts = 0
+    const signer = importedAlice()
+    const sign = signer.sign.bind(signer)
+    signer.sign = async (message: string) => {
+      prompts++
+      return sign(message)
+    }
+    const bad: unknown[] = [
+      null,
+      'x'.repeat(32),
+      Array.from({ length: 32 }, () => 1),
+      new Uint8Array(31),
+      new Uint16Array(32),
+    ]
+    for (const secretKey of bad) {
+      await expect(
+        deriveUserKey(signer, { secretKey: secretKey as Uint8Array }),
+      ).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    }
+    expect(prompts).toBe(0)
+  })
+
+  it('uses the Secret Key as it was at call time, even if the caller wipes it meanwhile', async () => {
+    const secret = fixedSecret(0x21)
+    const expected = await deriveUserKey(importedAlice(), { secretKey: fixedSecret(0x21) })
+    const pending = deriveUserKey(importedAlice(), { secretKey: secret })
+    secret.fill(0)
+    expect(arrEq(await pending, expected)).toBe(true)
+  })
+
+  it('never returns the key-only key when a Secret Key is supplied', async () => {
+    const keyOnly = await deriveUserKey(importedAlice())
+    for (const secretKey of [new Uint8Array(32), fixedSecret(1), fixedSecret(2)]) {
+      const mixed = await deriveUserKey(importedAlice(), { secretKey })
+      expect(arrEq(mixed, keyOnly)).toBe(false)
+    }
+  })
 })

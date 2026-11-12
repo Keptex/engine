@@ -50,7 +50,7 @@ type Vector = {
     /** key-plus-secret only: canonical recovery-code rendering of secretKeyHex. */
     recoveryCode?: string
   }
-  expected: { password: string }
+  expected: { password: string; userKeyHex?: string; siteKeyHex?: string }
 }
 
 function buildSigner(v: Vector): MockImportedSigner | MockNativeSigner {

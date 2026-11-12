@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "algorithm": "v2",
-  "lastGenerated": "2026-06-05",
+  "lastGenerated": "2026-11-12",
   "notes": [
     "Reference test vectors for @keptex/core.",
     "Each vector specifies (signer, options) inputs and the expected password output.",
@@ -11,8 +11,74 @@
     "expected.password values are computed by scripts/generate-vectors.mjs and checked by tests/test-vectors.test.ts, which recomputes every vector twice.",
     "securityMode (optional, defaults to 'key-only' when absent): 'key-only' uses the signer alone; 'key-plus-secret' (the optional second-factor mode) mixes a 32-byte Secret Key into the base userKey via HKDF-SHA-256(IKM=baseUserKey, salt=secretKey, info='com.keptex.secretkey', L=64) before site-key derivation.",
     "input.secretKeyHex (key-plus-secret only): the fixed 32-byte Secret Key, lower-case hex. Deterministic and hard-coded (byte[i] = (seed + i*step) & 0xff), never generated at random.",
-    "input.recoveryCode (optional): the canonical Crockford base32 recovery-code rendering of secretKeyHex (encodeRecoveryCode), included so independent implementations can verify the encode/decode round-trip."
+    "input.recoveryCode (optional): the canonical recovery code of secretKeyHex (encodeRecoveryCode): Crockford base32 of secretKey || CRC-24/OpenPGP(secretKey), 56 symbols in 14 groups of 4. Included so independent implementations can verify the encode/decode round-trip.",
+    "expected.userKeyHex and expected.siteKeyHex (key-plus-secret only): the 64-byte userKey after the Secret Key mix and the 32-byte site key, lower-case hex, so the mix can be checked without the password rendering. tests/second-factor-independent.test.ts recomputes them with node:crypto.",
+    "recoveryCodeVectors: 'valid' lists fixed keys with their only accepted code; 'invalid' lists codes every implementation must refuse (typing errors, wrong length, the 52-symbol format used before 2026-11-12, characters outside the alphabet)."
   ],
+  "recoveryCodeVectors": {
+    "format": "Crockford base32 (alphabet 0123456789ABCDEFGHJKMNPQRSTVWXYZ) of secretKey (32 bytes) || CRC-24/OpenPGP(secretKey) (3 bytes, big-endian; polynomial 0x864CFB, initial value 0xB704CE). 56 symbols, 14 groups of 4 separated by '-'. Decoding ignores white space, dashes and invisible format characters, accepts lower case and maps I and L to 1, O to 0.",
+    "valid": [
+      {
+        "name": "all-zero-key",
+        "secretKeyHex": "0000000000000000000000000000000000000000000000000000000000000000",
+        "recoveryCode": "0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0007-FE2G"
+      },
+      {
+        "name": "all-ff-key",
+        "secretKeyHex": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "recoveryCode": "ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZJ-HEFH"
+      },
+      {
+        "name": "vector-key-A",
+        "secretKeyHex": "11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3ea",
+        "recoveryCode": "24C1-Y9HD-6GXM-4JAG-AXF6-AV3K-FA0R-H3WP-KPJA-QCNS-R33W-XNEW-WFN3-YDBH"
+      },
+      {
+        "name": "vector-key-B",
+        "secretKeyHex": "808386898c8f9295989b9ea1a4a7aaadb0b3b6b9bcbfc2c5c8cbced1d4d7dadd",
+        "recoveryCode": "G21R-D2CC-HY99-B64V-KTGT-99XA-NPRB-7DNS-QJZW-5HE8-SF7D-3N6Q-VBEZ-8B13"
+      },
+      {
+        "name": "vector-key-C",
+        "secretKeyHex": "2a2f34393e43484d52575c61666b70757a7f84898e93989da2a7acb1b6bbc0c5",
+        "recoveryCode": "58QK-8E9Y-8D44-TMJQ-BHGP-CTVG-ENX7-Z149-HT9S-H7D2-MYPB-3DNV-R32K-GPBJ"
+      }
+    ],
+    "invalid": [
+      {
+        "name": "one-wrong-symbol",
+        "recoveryCode": "7000000000000000000000000000000000000000000000000007FE2G"
+      },
+      {
+        "name": "two-adjacent-symbols-swapped",
+        "recoveryCode": "0000000000000000000000000000000000000000000000000070FE2G"
+      },
+      {
+        "name": "wrong-last-symbol",
+        "recoveryCode": "0000000000000000000000000000000000000000000000000007FE27"
+      },
+      {
+        "name": "one-symbol-missing",
+        "recoveryCode": "0000000000000000000000000000000000000000000000000007FE2"
+      },
+      {
+        "name": "one-symbol-too-many",
+        "recoveryCode": "0000000000000000000000000000000000000000000000000007FE2G0"
+      },
+      {
+        "name": "previous-52-symbol-format",
+        "recoveryCode": "0000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "name": "letter-u-never-used",
+        "recoveryCode": "U000000000000000000000000000000000000000000000000007FE2G"
+      },
+      {
+        "name": "character-outside-the-alphabet",
+        "recoveryCode": "0000000000%00000000000000000000000000000000000000007FE2G"
+      }
+    ]
+  },
   "vectors": [
     {
       "name": "stellar-basic-github-default-policy",
@@ -114,9 +180,11 @@
         "username": "alice",
         "counter": 1,
         "secretKeyHex": "11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3ea",
-        "recoveryCode": "24C1-Y9HD-6GXM-4JAG-AXF6-AV3K-FA0R-H3WP-KPJA-QCNS-R33W-XNEW-WFN0"
+        "recoveryCode": "24C1-Y9HD-6GXM-4JAG-AXF6-AV3K-FA0R-H3WP-KPJA-QCNS-R33W-XNEW-WFN3-YDBH"
       },
       "expected": {
+        "userKeyHex": "974293091c4c1f3751c1b4cfa0b91e92ca6764296fb1ad74dab9e1a4192ae0b83ec3f99ed2de13b6c697d6569ac5ab15339770eb9c9f2ba35ec76084a8443b7d",
+        "siteKeyHex": "7805242721bbee7420ad65e0ceba3787e47de1202ba9ac3ffcd3579f959ed392",
         "password": "9?np7ryFrqdW#q-WsJOG1"
       }
     },
@@ -136,9 +204,11 @@
         "username": "alice",
         "counter": 1,
         "secretKeyHex": "808386898c8f9295989b9ea1a4a7aaadb0b3b6b9bcbfc2c5c8cbced1d4d7dadd",
-        "recoveryCode": "G21R-D2CC-HY99-B64V-KTGT-99XA-NPRB-7DNS-QJZW-5HE8-SF7D-3N6Q-VBEG"
+        "recoveryCode": "G21R-D2CC-HY99-B64V-KTGT-99XA-NPRB-7DNS-QJZW-5HE8-SF7D-3N6Q-VBEZ-8B13"
       },
       "expected": {
+        "userKeyHex": "d9f677a756eb09e0d65afdee7cbce013967bb7db2f708a9c03df281b49eff7b9a30777838096f25538b578ac076ce7789391004640e05631ccafa61efcfd22a6",
+        "siteKeyHex": "da2c34793688c69a3e1ceb48ac9e1afe36e01c10164fc7ead54c38550946c5b6",
         "password": "KtcUrWH*-@A5h$*8iL5Qg"
       }
     },
@@ -157,9 +227,11 @@
         "username": "alice",
         "counter": 1,
         "secretKeyHex": "2a2f34393e43484d52575c61666b70757a7f84898e93989da2a7acb1b6bbc0c5",
-        "recoveryCode": "58QK-8E9Y-8D44-TMJQ-BHGP-CTVG-ENX7-Z149-HT9S-H7D2-MYPB-3DNV-R32G"
+        "recoveryCode": "58QK-8E9Y-8D44-TMJQ-BHGP-CTVG-ENX7-Z149-HT9S-H7D2-MYPB-3DNV-R32K-GPBJ"
       },
       "expected": {
+        "userKeyHex": "d064cc4fbbfccaa09a727be3eee4933c19a52a2ca644918017ce795baa70ea4f70021a71451d5cea3ac47ba4bfc0b8698202ee1fe5278a167114bb4dcb703acd",
+        "siteKeyHex": "7c871ee9f7723e0e3793c61f7583e88f48fcb4a3bc173e80df8832c494d892a2",
         "password": "Mq1G2e-2hl9HPXJm5Tv*R"
       }
     }

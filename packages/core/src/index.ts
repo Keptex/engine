@@ -20,6 +20,8 @@ export {
   generateSecretKey,
   encodeRecoveryCode,
   decodeRecoveryCode,
+  crc24,
+  RECOVERY_CODE_SYMBOLS,
 } from './secret-key.js'
 
 export { derivePassword, derivePasswordFromUserKey } from './password.js'

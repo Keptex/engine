@@ -11,8 +11,10 @@ import { dirname, resolve } from 'node:path'
 import {
   derivePassword,
   derivePasswordFromUserKey,
+  deriveSiteKey,
   deriveUserKey,
   encodeRecoveryCode,
+  decodeRecoveryCode,
   DEFAULT_POLICY,
 } from '../dist/index.js'
 import { MockImportedSigner, MockNativeSigner } from '../dist/testing/index.js'
@@ -27,6 +29,10 @@ function hexToBytes(hex) {
     out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
   }
   return out
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 const file = JSON.parse(await readFile(vectorsPath, 'utf-8'))
@@ -72,6 +78,17 @@ for (const v of file.vectors) {
 
     const userKey = await deriveUserKey(signer, { secretKey })
     r = await derivePasswordFromUserKey(userKey, opts)
+
+    // Intermediate values, so an independent implementation can check the
+    // Secret Key mix on its own (before the password rendering).
+    const userKeyHex = bytesToHex(userKey)
+    const siteKeyHex = bytesToHex(
+      await deriveSiteKey(userKey, opts.service, opts.username, opts.counter),
+    )
+    if (v.expected.userKeyHex !== userKeyHex || v.expected.siteKeyHex !== siteKeyHex) {
+      v.expected = { userKeyHex, siteKeyHex, password: v.expected.password }
+      updated++
+    }
   } else {
     r = await derivePassword(signer, opts)
   }
@@ -80,6 +97,50 @@ for (const v of file.vectors) {
     console.log(`updated ${v.name}: ${v.expected.password} -> ${r.password}`)
     v.expected.password = r.password
     updated++
+  }
+}
+
+// Recovery-code vectors: the canonical code of each fixed key, and codes that
+// must be refused. The refused codes are built from the first valid one.
+if (file.recoveryCodeVectors) {
+  for (const entry of file.recoveryCodeVectors.valid) {
+    const code = encodeRecoveryCode(hexToBytes(entry.secretKeyHex))
+    if (entry.recoveryCode !== code) {
+      entry.recoveryCode = code
+      updated++
+    }
+  }
+  const base = file.recoveryCodeVectors.valid[0].recoveryCode
+  const symbols = base.replace(/-/g, '')
+  const flip = (ch) => (ch === '7' ? '8' : '7')
+  const built = {
+    'one-wrong-symbol': flip(symbols[0]) + symbols.slice(1),
+    'two-adjacent-symbols-swapped': (() => {
+      let i = 0
+      while (symbols[i] === symbols[i + 1]) i++
+      return symbols.slice(0, i) + symbols[i + 1] + symbols[i] + symbols.slice(i + 2)
+    })(),
+    'wrong-last-symbol': symbols.slice(0, -1) + flip(symbols[symbols.length - 1]),
+    'one-symbol-missing': symbols.slice(0, -1),
+    'one-symbol-too-many': symbols + '0',
+    'previous-52-symbol-format': symbols.slice(0, 51) + '0',
+    'letter-u-never-used': 'U' + symbols.slice(1),
+    'character-outside-the-alphabet': symbols.slice(0, 10) + '%' + symbols.slice(11),
+  }
+  for (const entry of file.recoveryCodeVectors.invalid) {
+    const code = built[entry.name]
+    if (code === undefined) throw new Error(`no builder for invalid code ${entry.name}`)
+    let refused = false
+    try {
+      decodeRecoveryCode(code)
+    } catch {
+      refused = true
+    }
+    if (!refused) throw new Error(`invalid code ${entry.name} was accepted`)
+    if (entry.recoveryCode !== code) {
+      entry.recoveryCode = code
+      updated++
+    }
   }
 }
 

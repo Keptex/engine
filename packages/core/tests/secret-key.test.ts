@@ -33,12 +33,12 @@ describe('generateSecretKey', () => {
 })
 
 describe('encodeRecoveryCode', () => {
-  it('produces 52 base32 chars in 13 groups of 4', () => {
+  it('produces 56 base32 chars in 14 groups of 4', () => {
     const code = encodeRecoveryCode(fixedKey(0x01))
     const groups = code.split('-')
-    expect(groups.length).toBe(13)
+    expect(groups.length).toBe(14)
     for (const g of groups) expect(g.length).toBe(4)
-    expect(code.replace(/-/g, '').length).toBe(52)
+    expect(code.replace(/-/g, '').length).toBe(56)
   })
 
   it('uses only the Crockford alphabet', () => {
@@ -98,11 +98,15 @@ describe('decodeRecoveryCode tolerance', () => {
         .replace(/0/g, 'O')
       expectEqual(decodeRecoveryCode(aliased), key)
     }
-    // Direct, deterministic alias check independent of the sampled key
-    // (52 symbols = the canonical recovery-code length → 32 bytes):
-    const zeros = '0'.repeat(52)
-    const ohs = 'O'.repeat(52)
-    expectEqual(decodeRecoveryCode(ohs), decodeRecoveryCode(zeros))
+    // Direct, deterministic alias check independent of the sampled key: the
+    // code of the all-zero key starts with 51 zeros, written here as 'O'.
+    const zeroKey = new Uint8Array(32)
+    const zeroCode = encodeRecoveryCode(zeroKey).replace(/-/g, '')
+    expect(zeroCode.startsWith('0'.repeat(51))).toBe(true)
+    expectEqual(decodeRecoveryCode(zeroCode.replace(/0/g, 'O')), zeroKey)
+    const onesKey = decodeRecoveryCode(encodeRecoveryCode(fixedKey(0x42)))
+    const onesCode = encodeRecoveryCode(onesKey).replace(/-/g, '')
+    expectEqual(decodeRecoveryCode(onesCode.replace(/1/g, 'L')), onesKey)
   })
 })
 
