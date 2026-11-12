@@ -20,9 +20,15 @@ paths = [
   # Published Ed25519 edge cases (Taming the many EdDSAs, CCTV, dalek
   # non-canonical encodings): public keys and signatures, no secret.
   '''packages/stellar-root/tests/fixtures/ed25519-edge-cases\.json''',
+  # Ledger Sync shared vectors (docs/LEDGER-SYNC.md section 8): the fixed
+  # user key 0x00..0x3f, contract id 0x11..0x11 and their outputs.
+  '''packages/ledger-sync/test-vectors\.json''',
 ]
-# One public key used by the SEP-23 strkey tests, matched exactly rather
-# than allowlisting the whole test file.
 regexes = [
+  # One public key used by the SEP-23 strkey tests, matched exactly rather
+  # than allowlisting the whole test file.
   '''^3f0c34bf93ad0d9971d04ccc90f705511c838aad9734a4a2fb0d7a03fc7fe89a$''',
+  # Public HMAC and HKDF domain separators such as com.keptex.ledger.v1,
+  # flagged by the generic rule when they follow the word "key".
+  '''^com\.keptex\.[A-Za-z0-9.-]+$''',
 ]

@@ -1,0 +1,41 @@
+{
+  "name": "@keptex/ledger-sync",
+  "version": "0.1.0",
+  "description": "Keptex Ledger Sync: the Ledger Identity derived from the user key, the signed publish and remove payloads of the KeptexSyncRegistry Soroban contract, the dedicated encrypted sync envelope and the sequence choice. Source-available (PolyForm Noncommercial).",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./test-vectors.json": "./test-vectors.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "test-vectors.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "vectors": "node scripts/generate-vectors.mjs",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@keptex/stellar-root": "workspace:*",
+    "@noble/ciphers": "1.3.0",
+    "@noble/curves": "1.9.7",
+    "@noble/hashes": "1.8.0"
+  },
+  "devDependencies": {
+    "@keptex/core": "workspace:*",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.6"
+  }
+}
