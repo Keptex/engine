@@ -1,5 +1,4 @@
 {
-  "$schema": "https://keptex.app/schemas/test-vectors-v1.json",
   "schemaVersion": 1,
   "algorithm": "v2",
   "lastGenerated": "2026-06-05",
@@ -9,7 +8,10 @@
     "Vectors are language-agnostic and can be verified by any independent re-implementation.",
     "Path A (wallet-imported): the 'signature' field is the fixed signature returned by the mock signer.",
     "Path B (wallet-native): the 'userKey' field is the fixed 64-byte userKey returned by the mock signer.",
-    "expected.password values: TBD, to be populated once Étape 1 tests pass on a clean run."
+    "expected.password values are computed by scripts/generate-vectors.mjs and checked by tests/test-vectors.test.ts, which recomputes every vector twice.",
+    "securityMode (optional, defaults to 'key-only' when absent): 'key-only' uses the signer alone; 'key-plus-secret' (the optional second-factor mode) mixes a 32-byte Secret Key into the base userKey via HKDF-SHA-256(IKM=baseUserKey, salt=secretKey, info='com.keptex.secretkey', L=64) before site-key derivation.",
+    "input.secretKeyHex (key-plus-secret only): the fixed 32-byte Secret Key, lower-case hex. Deterministic and hard-coded (byte[i] = (seed + i*step) & 0xff), never generated at random.",
+    "input.recoveryCode (optional): the canonical Crockford base32 recovery-code rendering of secretKeyHex (encodeRecoveryCode), included so independent implementations can verify the encode/decode round-trip."
   ],
   "vectors": [
     {
@@ -94,6 +96,71 @@
       },
       "expected": {
         "password": "8067"
+      }
+    },
+    {
+      "name": "stellar-github-secretkey-A",
+      "description": "key-plus-secret (second-factor mode): same Stellar wallet/service/username/counter as 'stellar-basic-github-default-policy', but mixed with fixed Secret Key A. Must differ from the key-only password.",
+      "path": "A",
+      "securityMode": "key-plus-secret",
+      "input": {
+        "signer": {
+          "type": "wallet-imported",
+          "chain": "stellar",
+          "address": "GAXYTRQK3CPMHFZ4WLOVB5HJDD5R7VLNXTPHAESVFRH7BYIMW2EXY7QY",
+          "signatureHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526272829"
+        },
+        "service": "github.com",
+        "username": "alice",
+        "counter": 1,
+        "secretKeyHex": "11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3ea",
+        "recoveryCode": "24C1-Y9HD-6GXM-4JAG-AXF6-AV3K-FA0R-H3WP-KPJA-QCNS-R33W-XNEW-WFN0"
+      },
+      "expected": {
+        "password": "9?np7ryFrqdW#q-WsJOG1"
+      }
+    },
+    {
+      "name": "stellar-github-secretkey-B",
+      "description": "key-plus-secret (second-factor mode): identical signer/service/username/counter to 'stellar-github-secretkey-A' but a DIFFERENT fixed Secret Key B, proving the Secret Key alone changes the password.",
+      "path": "A",
+      "securityMode": "key-plus-secret",
+      "input": {
+        "signer": {
+          "type": "wallet-imported",
+          "chain": "stellar",
+          "address": "GAXYTRQK3CPMHFZ4WLOVB5HJDD5R7VLNXTPHAESVFRH7BYIMW2EXY7QY",
+          "signatureHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20212223242526272829"
+        },
+        "service": "github.com",
+        "username": "alice",
+        "counter": 1,
+        "secretKeyHex": "808386898c8f9295989b9ea1a4a7aaadb0b3b6b9bcbfc2c5c8cbced1d4d7dadd",
+        "recoveryCode": "G21R-D2CC-HY99-B64V-KTGT-99XA-NPRB-7DNS-QJZW-5HE8-SF7D-3N6Q-VBEG"
+      },
+      "expected": {
+        "password": "KtcUrWH*-@A5h$*8iL5Qg"
+      }
+    },
+    {
+      "name": "native-github-secretkey-recovery-roundtrip",
+      "description": "key-plus-secret (second-factor mode), Path B native signer, fixed Secret Key C with its canonical recovery code. Verifies encode(secretKey) == recoveryCode and decode(recoveryCode) == secretKey, then that the decoded key derives the expected password.",
+      "path": "B",
+      "securityMode": "key-plus-secret",
+      "input": {
+        "signer": {
+          "type": "wallet-native",
+          "identifier": "keptex-native:test-alice",
+          "userKeyHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40"
+        },
+        "service": "github.com",
+        "username": "alice",
+        "counter": 1,
+        "secretKeyHex": "2a2f34393e43484d52575c61666b70757a7f84898e93989da2a7acb1b6bbc0c5",
+        "recoveryCode": "58QK-8E9Y-8D44-TMJQ-BHGP-CTVG-ENX7-Z149-HT9S-H7D2-MYPB-3DNV-R32G"
+      },
+      "expected": {
+        "password": "Mq1G2e-2hl9HPXJm5Tv*R"
       }
     }
   ]

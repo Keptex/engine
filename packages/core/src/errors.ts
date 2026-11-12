@@ -1,6 +1,7 @@
 export type KeptexErrorCode =
   | 'INVALID_INPUT'
   | 'INVALID_POLICY'
+  | 'INVALID_RECOVERY_CODE'
   | 'SIGN_FAILED'
   | 'DERIVE_FAILED'
   | 'UNSUPPORTED_ENV'

@@ -3,6 +3,9 @@ import type { Signer } from './types.js'
 
 export const SCOPES = {
   authentication: 'com.keptex.authentication',
+  identification: 'com.keptex.identification',
+  recovery: 'com.keptex.recovery',
+  secretKey: 'com.keptex.secretkey',
 } as const
 
 export function assertCrypto(): void {
@@ -57,6 +60,39 @@ async function pbkdf2(
   return new Uint8Array(bits)
 }
 
+/**
+ * HKDF-SHA-256 (extract-and-expand) via Web Crypto.
+ *
+ * Used to mix the optional Secret Key (second factor) into the base userKey,
+ * so that a leaked wallet alone cannot regenerate credentials.
+ */
+async function hkdfSha256(
+  ikm: Uint8Array,
+  salt: Uint8Array,
+  info: Uint8Array,
+  keyLength: number,
+): Promise<Uint8Array> {
+  assertCrypto()
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    ikm as BufferSource,
+    { name: 'HKDF' },
+    false,
+    ['deriveBits'],
+  )
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: salt as BufferSource,
+      info: info as BufferSource,
+    },
+    keyMaterial,
+    keyLength * 8,
+  )
+  return new Uint8Array(bits)
+}
+
 export async function hmacSha256(key: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
   assertCrypto()
   const cryptoKey = await crypto.subtle.importKey(
@@ -71,16 +107,53 @@ export async function hmacSha256(key: Uint8Array, data: Uint8Array): Promise<Uin
 }
 
 /**
+ * Build the human-readable message a wallet-imported signer signs to derive the
+ * base user key. The user sees exactly what they approve in the wallet pop-up,
+ * while the message still binds the wallet identifier and the second-factor
+ * mode, so a different account or mode yields a different signature (hence a
+ * different key).
+ *
+ * The identifier is a chain-prefixed address (e.g. "stellar:GAXY...", produced
+ * by the chain adapters). We reject control characters defensively so the
+ * labelled lines stay unambiguous and no identifier can forge another line; the
+ * trailing `Scope:` line terminates the `Account:` value.
+ */
+function buildAuthMessage(identifier: string, secondFactor: boolean): string {
+  for (let i = 0; i < identifier.length; i++) {
+    if (identifier.charCodeAt(i) < 0x20) {
+      throw new KeptexError('Signer identifier contains control characters', 'INVALID_INPUT')
+    }
+  }
+  const lines = [
+    'Keptex',
+    '',
+    'Sign to derive your passwords and passkeys on this device, from your wallet.',
+    '',
+    'This signature never leaves your device and is never sent anywhere.',
+    'It cannot move funds, transfer tokens, or approve any transaction.',
+    '',
+    `Account: ${identifier}`,
+  ]
+  if (secondFactor) lines.push('Second factor: enabled')
+  lines.push('Scope: com.keptex.authentication.v1')
+  return lines.join('\n')
+}
+
+/**
  * Phase 1 (base): derive the 64-byte base user key from the signer alone.
  *
- * Path A (wallet-imported): PBKDF2(signature on scoped message, identifier, 100k iter)
- * Path B (wallet-native):   delegated to signer.extractUserKey(salt), internal HKDF
- *                           on the BIP-39 seed, never exposing the seed to core (D-015)
+ * Path A (wallet-imported): PBKDF2(signature on the human-readable auth message,
+ *                           identifier, 100k iter)
+ * Path B (wallet-native):   delegated to signer.extractUserKey(scope), internal
+ *                           HKDF on the BIP-39 seed, never exposing the seed (D-015)
+ *
+ * `secondFactor` only affects Path A: it adds a "Second factor: enabled" line to
+ * the signed message so the wallet pop-up reflects the active security mode.
  */
-async function deriveBaseUserKey(signer: Signer): Promise<Uint8Array> {
+async function deriveBaseUserKey(signer: Signer, secondFactor: boolean): Promise<Uint8Array> {
   if (signer.type === 'wallet-imported') {
     const id = signer.identifier()
-    const message = `${SCOPES.authentication}\0${id.length}\0${id}`
+    const message = buildAuthMessage(id, secondFactor)
 
     let signatureBytes: Uint8Array
     try {
@@ -120,14 +193,37 @@ async function deriveBaseUserKey(signer: Signer): Promise<Uint8Array> {
 }
 
 /**
- * Phase 1: derive the 64-byte session user key from the signer.
+ * Phase 1: derive a 64-byte user key from the signer, with an optional
+ * second factor (the "Secret Key").
  *
- * Path A (wallet-imported) and Path B (wallet-native) are handled by
- * `deriveBaseUserKey`. The result is cached in RAM for the session and never
- * persisted.
+ * Mode A (key-only, default): returns the base userKey unchanged, so existing
+ * test vectors remain byte-identical.
+ *
+ * Mode B (two-factor): if `options.secretKey` (exactly 32 bytes) is supplied,
+ * mixes it into the base userKey via
+ *   HKDF-SHA-256(IKM = baseUserKey, salt = secretKey, info = 'com.keptex.secretkey', L = 64).
+ * A leaked wallet alone can no longer regenerate credentials without the
+ * Secret Key.
  */
-export async function deriveUserKey(signer: Signer): Promise<Uint8Array> {
-  return deriveBaseUserKey(signer)
+export async function deriveUserKey(
+  signer: Signer,
+  options?: { secretKey?: Uint8Array },
+): Promise<Uint8Array> {
+  const secretKey = options?.secretKey
+  const baseUserKey = await deriveBaseUserKey(signer, secretKey !== undefined)
+
+  if (secretKey === undefined) {
+    return baseUserKey
+  }
+
+  if (secretKey.length !== 32) {
+    throw new KeptexError(
+      `Secret Key must be exactly 32 bytes (got ${secretKey.length})`,
+      'INVALID_INPUT',
+    )
+  }
+
+  return hkdfSha256(baseUserKey, secretKey, encodeUtf8(SCOPES.secretKey), 64)
 }
 
 /**

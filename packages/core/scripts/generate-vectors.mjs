@@ -10,6 +10,9 @@ import { dirname, resolve } from 'node:path'
 
 import {
   derivePassword,
+  derivePasswordFromUserKey,
+  deriveUserKey,
+  encodeRecoveryCode,
   DEFAULT_POLICY,
 } from '../dist/index.js'
 import { MockImportedSigner, MockNativeSigner } from '../dist/testing/index.js'
@@ -49,7 +52,29 @@ for (const v of file.vectors) {
     policy: v.input.policy ?? DEFAULT_POLICY,
   }
 
-  const r = await derivePassword(signer, opts)
+  // key-only (default, absent securityMode) vs key-plus-secret (D-021).
+  let r
+  if (v.securityMode === 'key-plus-secret') {
+    const secretKey = hexToBytes(v.input.secretKeyHex)
+    if (secretKey.length !== 32) {
+      throw new Error(`${v.name}: secretKeyHex must decode to 32 bytes`)
+    }
+
+    // Keep the recovery code in sync with the fixed Secret Key, when present.
+    const recoveryCode = encodeRecoveryCode(secretKey)
+    if (v.input.recoveryCode !== undefined && v.input.recoveryCode !== recoveryCode) {
+      console.log(
+        `updated ${v.name} recoveryCode: ${v.input.recoveryCode} -> ${recoveryCode}`,
+      )
+      v.input.recoveryCode = recoveryCode
+      updated++
+    }
+
+    const userKey = await deriveUserKey(signer, { secretKey })
+    r = await derivePasswordFromUserKey(userKey, opts)
+  } else {
+    r = await derivePassword(signer, opts)
+  }
 
   if (v.expected.password !== r.password) {
     console.log(`updated ${v.name}: ${v.expected.password} -> ${r.password}`)

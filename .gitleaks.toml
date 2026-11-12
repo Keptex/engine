@@ -1,0 +1,17 @@
+# Gitleaks configuration for the Keptex engine.
+#
+# The default rules stay on. The only allowlisted paths are the published,
+# deliberately public test vectors: fixed mock signatures, fixed user keys
+# and fixed secret keys whose whole purpose is to be reproduced by anyone.
+# None of them protects anything. Every other file is scanned normally.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public test vectors (fixed, non-secret inputs)"
+paths = [
+  # Password derivation vectors: mock signatures, mock user keys, fixed
+  # secret keys and their recovery codes (TEST-VECTORS.md).
+  '''packages/core/src/test-vectors\.json''',
+]

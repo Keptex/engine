@@ -6,7 +6,7 @@ This is the trust layer of Keptex. It contains the algorithm, and nothing else. 
 
 ## Install
 
-Keptex packages are not yet published to npm. Within the monorepo, depend on the workspace:
+Keptex packages are not yet published to npm. Within this workspace, depend on the package:
 
 ```json
 {
@@ -24,12 +24,15 @@ Top-level exports from `@keptex/core`:
 
 | Export | Kind | Purpose |
 |---|---|---|
-| `deriveUserKey(signer)` | function | Phase 1: derive the 64-byte session `userKey`. One call per session. |
+| `deriveUserKey(signer, options?)` | function | Phase 1: derive the 64-byte session `userKey`. One call per session. The optional `{ secretKey }` enables the second-factor mode (see below). |
 | `deriveSiteKey(userKey, opts)` | function | Phase 2: derive a per-service 32-byte siteKey. |
 | `derivePassword(signer, opts)` | function | One-shot convenience: combines Phase 1 + Phase 2 + Phase 3a. |
 | `derivePasswordFromUserKey(userKey, opts)` | function | Phase 3a from a cached userKey (the cached path). |
+| `generateSecretKey()` | function | Generate a fresh 32-byte secret key for the second-factor mode (CSPRNG). |
+| `encodeRecoveryCode(secretKey)` | function | Encode a 32-byte secret key as a Crockford base32 recovery code (52 characters, 13 dash-separated groups of 4). |
+| `decodeRecoveryCode(code)` | function | Decode a recovery code back to the 32-byte secret key. Tolerant parse; throws `KeptexError('INVALID_RECOVERY_CODE')` on a malformed code. |
 | `WalletSigner` | class | Convenience wrapper around an `(address, signMessage)` pair. |
-| `SCOPES` | constant | The authentication domain separator. |
+| `SCOPES` | constant | Domain separators used in Phase 1: `authentication` and `secretKey`, plus two reserved labels (`identification`, `recovery`) that no derivation uses yet. |
 | `DEFAULT_POLICY` | constant | Default `PasswordPolicy` (length 21, all classes enabled). |
 | `KeptexError` | class | Typed error with `code: KeptexErrorCode`. |
 | Types | type | `Signer`, `ImportedWalletSigner`, `NativeWalletSigner`, `WalletChain`, `SignerType`, `PasswordPolicy`, `DerivePasswordOptions`, `DerivePasswordResult`, `WalletSignerOptions`, `KeptexErrorCode`. |
@@ -72,14 +75,45 @@ const { password } = await derivePassword(signer, {
 })
 ```
 
-For a worked example of every phase against the published vectors, see [ALGORITHM.md](../../ALGORITHM.md) section 10.
+Second-factor mode (`key-plus-secret`): a vault may, permanently and at creation time, mix a 32-byte secret key into the `userKey`, so that a leaked wallet alone can no longer regenerate credentials. Pass the secret key to `deriveUserKey`; everything downstream is unchanged:
+
+```ts
+import {
+  deriveUserKey,
+  derivePasswordFromUserKey,
+  generateSecretKey,
+  encodeRecoveryCode,
+  decodeRecoveryCode,
+} from '@keptex/core'
+
+// At vault creation, once:
+const secretKey = generateSecretKey()                 // 32 random bytes
+const recoveryCode = encodeRecoveryCode(secretKey)    // show to the user exactly once
+// "ABCD-EFGH-..." (52 characters, 13 dash-separated groups of 4)
+
+// Per session, derive with the secret key folded in via
+// HKDF-SHA-256(IKM = baseUserKey, salt = secretKey, info = "com.keptex.secretkey", L = 64):
+const userKey = await deriveUserKey(signer, { secretKey })
+const { password } = await derivePasswordFromUserKey(userKey, {
+  service: 'github.com',
+  username: 'alice@example.com',
+})
+
+// Recovery: the recovery code round-trips back to the same secret key.
+const restored = decodeRecoveryCode(recoveryCode)     // same 32 bytes as secretKey
+```
+
+When the `{ secretKey }` option is omitted, `deriveUserKey` behaves as in `key-only` mode. The secret key must be exactly 32 bytes when present. With an imported wallet, the second-factor mode also adds the line `Second factor: enabled` to the message the wallet signs (see [ALGORITHM.md](../../ALGORITHM.md) section 4), so the wallet pop-up shows the active mode. Storing the secret key (for example inside an encrypted vault) is up to the application; this package never persists anything.
+
+For a worked example of every phase against the published vectors, see [TEST-VECTORS.md](../../TEST-VECTORS.md).
 
 ## Algorithm reference
 
 | Phase | Input | Output | Primitive |
 |---|---|---|---|
-| 1 (Path A) | Imported wallet signature | `userKey` (64 bytes) | PBKDF2-SHA-256, 100 000 iterations |
+| 1 (Path A) | Imported wallet signature of the human-readable authentication message | `userKey` (64 bytes) | PBKDF2-SHA-256, 100 000 iterations |
 | 1 (Path B) | BIP-39 seed (via `NativeWalletSigner.extractUserKey`) | `userKey` (64 bytes) | HKDF-SHA-256 |
+| 1 (second factor, optional) | base `userKey` + 32-byte secret key | `userKey` (64 bytes) | HKDF-SHA-256, info `com.keptex.secretkey` |
 | 2 | `userKey` + `(service, username, counter)` | `siteKey` (32 bytes) | HMAC-SHA-256 |
 | 3a | `siteKey` + `policy` | password string | `DeterministicStream` with rejection sampling + Fisher-Yates |
 

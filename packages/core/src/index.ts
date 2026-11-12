@@ -16,6 +16,12 @@ export type { KeptexErrorCode } from './errors.js'
 
 export { deriveUserKey, deriveSiteKey, SCOPES } from './algorithm.js'
 
+export {
+  generateSecretKey,
+  encodeRecoveryCode,
+  decodeRecoveryCode,
+} from './secret-key.js'
+
 export { derivePassword, derivePasswordFromUserKey } from './password.js'
 
 export { WalletSigner } from './signers/index.js'
